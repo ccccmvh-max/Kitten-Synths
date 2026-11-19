@@ -1,0 +1,42 @@
+diff --git a/firmware/src/lcd.c b/firmware/src/lcd.c
+index a337a3c..e23ca43 100644
+--- a/firmware/src/lcd.c
++++ b/firmware/src/lcd.c
+@@ -74,6 +74,12 @@ static void lcd_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c)
+         w = 240u - x;
+     if (y + h > 240u)
+         h = 240u - y;
++    /* Stretch virtual rows 0..239 onto the 320 physical display rows. */
++    {
++        uint32_t end = y + h;
++        y += y / 3u;
++        h = end + end / 3u - y;
++    }
+     lcd_sync();
+     k = 240u / w * w;                       /* whole rows per transfer (narrow fills: one DMA) */
+     for (i = 0; i < k; i++)
+@@ -88,10 +94,22 @@ static void lcd_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint16_t c)
+ 
+ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint16_t *px)
+ {
++    uint32_t r = 0u, group = 3u - (y % 3u), end;
+     if (!w || !h)
+         return;
+-    lcd_window(x, y, x + w - 1u, y + h - 1u);
+-    lcd_data(px, w * h * 2u);
++    end = y + h;
++    lcd_window(x, y + y / 3u, x + w - 1u, end + end / 3u - 1u);
++    /* Every third source row is sent twice: 240 virtual -> 320 physical.
++     * Send up to three contiguous rows per DMA, keeping the original strip
++     * buffer and the same draw coordinates for the entire Kitten UI. */
++    while (r < h) {
++        uint32_t n = h - r < group ? h - r : group;
++        lcd_data(px + r * w, n * w * 2u);
++        r += n;
++        if (n == group)
++            lcd_data(px + (r - 1u) * w, w * 2u);
++        group = 3u;
++    }
+ }
+ 
+ /* ST7789V init: reset, then 16-bit colour, scan direction and IPS inversion;
