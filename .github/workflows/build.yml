@@ -74,6 +74,15 @@ jobs:
           set -o pipefail
           cd sloop && bash ./build.sh --release "$VERSION" 2>&1 | tee ../build.log
 
+      # Publish the installable firmware as soon as it builds; the full 10-minute
+      # regression suite and the website can continue without delaying downloads.
+      - name: Upload FM-1 240x320 firmware (early)
+        uses: actions/upload-artifact@v4
+        with:
+          name: kitten-fm1-240x320-fwsc
+          path: sloop/build/felucca-2.8-kitten.fwsc
+          if-no-files-found: error
+
       - name: The end of the build log (if it failed)
         if: failure()
         run: |
