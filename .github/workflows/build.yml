@@ -12,7 +12,7 @@ on:
         default: ""
   push:
     branches: [main]
-    paths: ["muug.patch", "fix-*.patch", "splashes y logos/**", ".github/workflows/build.yml"]
+    paths: ["muug.patch", "fix-*.patch", "tools/fix26_live_sections.py", "splashes y logos/**", ".github/workflows/build.yml"]
 
 env:
   SLOOP_COMMIT: ec9e53721cc576816a5750220391f2d0217c01cb     # SLOOP 2.8 (isod89/sloop-fm1)
