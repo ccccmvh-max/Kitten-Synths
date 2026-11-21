@@ -186,4 +186,13 @@ replace(main,
     '    scene_extra_boot();       /* hydrate the live A-D extras before restoring the working loop */\n'
     '    autosave_resume();')
 
+# The program slot is nearly full: omit only the decorative spider web
+# behind UI envelope/filter graphs. The graph itself and all controls remain.
+gfx_ui = root / "firmware/src/ui_draw.c"
+gfx_src = gfx_ui.read_text()
+decor = "cv_web(C_LINE);"
+if gfx_src.count(decor) < 1:
+    raise SystemExit("Expected decorative graph-web call not present")
+gfx_ui.write_text(gfx_src.replace(decor, "/* decorative overlay omitted for scene memory */"))
+
 print("Scene fix applied to", root)
