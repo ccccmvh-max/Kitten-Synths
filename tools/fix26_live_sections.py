@@ -40,15 +40,23 @@ replace(store,
     "    else\n"
     "        proj_trk_capture(r, TRK_DRUM2);")
 
+replace(proj,
+    '#include "arranger_scene.c"',
+    '''/* Extra live sections are declared before arranger_scene.c, since that
+ * inclusion uses song_extra and scene_extra_apply. */
+static proj_trk_t scene_extra[4][2];
+static proj_trk_t song_extra[2];
+static uint8_t scene_extra_valid[4];      /* bit 0 LITE, bit 1 second drums */
+static uint8_t scene_extra_dirty;         /* live saves needing flash flush */
+static void scene_extra_apply_pair(const project_t *, const proj_trk_t *, const proj_trk_t *, uint32_t);
+static void scene_extra_apply(uint32_t, const project_t *);
+#include "arranger_scene.c"''')
+
 insert=r'''/* fix-26: the original project format has only tracks 1,2,3 and drum 1.
  * LITE and drum 2 need separate RAM copies for live A-D changes: flash reads
  * cannot run inside the audio interrupt at a scene boundary.
  * These are normal BSS; the NOINIT area is full of the original four sections.
  */
-static proj_trk_t scene_extra[4][2];
-static proj_trk_t song_extra[2];
-static uint8_t scene_extra_valid[4];      /* bit 0 LITE, bit 1 second drums */
-static uint8_t scene_extra_dirty;         /* live saves needing flash flush */
 
 UI_SMALL static void scene_extra_capture(uint32_t s)
 {
