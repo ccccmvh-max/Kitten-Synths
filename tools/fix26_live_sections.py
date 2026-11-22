@@ -205,7 +205,7 @@ gfx_src = gfx_src.replace(decor, "/* decorative overlay omitted for scene memory
 # The user's actual synth menus, note indicators and 240x320 stretching stay.
 # When these calls disappear the C compiler can omit the unused drawing routines.
 import re
-header_decor = re.compile(r"(?m)^    cv_(?:roofs|cat)\\([^;\\n]*\\);[^\\n]*$")
+header_decor = re.compile(r"(?m)^    cv_(?:roofs|cat)\([^;\n]*\);[^\n]*$")
 calls = header_decor.findall(gfx_src)
 if len(calls) != 6:
     raise SystemExit(f"Expected 3 skyline and 3 cat calls, got {len(calls)}")
