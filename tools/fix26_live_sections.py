@@ -40,19 +40,12 @@ replace(store,
     "    else\n"
     "        proj_trk_capture(r, TRK_DRUM2);")
 
-replace(proj,
-    '#include "arranger_scene.c"',
-    '''/* Extra live sections are declared before arranger_scene.c, since that
- * inclusion uses song_extra and scene_extra_apply. */
-static proj_trk_t scene_extra[4][2];
+insert=r'''static proj_trk_t scene_extra[4][2];
 static proj_trk_t song_extra[2];
-static uint8_t scene_extra_valid[4];      /* bit 0 LITE, bit 1 second drums */
-static uint8_t scene_extra_dirty;         /* live saves needing flash flush */
-static void scene_extra_apply_pair(const project_t *, const proj_trk_t *, const proj_trk_t *, uint32_t);
-static void scene_extra_apply(uint32_t, const project_t *);
-#include "arranger_scene.c"''')
+static uint8_t scene_extra_valid[4];
+static uint8_t scene_extra_dirty;
 
-insert=r'''/* fix-26: the original project format has only tracks 1,2,3 and drum 1.
+/* fix-26: the original project format has only tracks 1,2,3 and drum 1.
  * LITE and drum 2 need separate RAM copies for live A-D changes: flash reads
  * cannot run inside the audio interrupt at a scene boundary.
  * These are normal BSS; the NOINIT area is full of the original four sections.
@@ -87,7 +80,12 @@ UI_SMALL static void scene_extra_apply(uint32_t s, const project_t *p)
     scene_extra_apply_pair(p, &scene_extra[s][0], &scene_extra[s][1], scene_extra_valid[s]);
 }
 
-/* Only at power-on, after persist_boot has read the original sections and
+
+'''
+replace(proj,
+    '#ifndef PROJ_HOST\n#if FELUCCA_ARRANGER\n#include "arranger_scene.c"',
+    insert+'#ifndef PROJ_HOST\n#if FELUCCA_ARRANGER\n#include "arranger_scene.c"')
+boot=r'''/* Only at power-on, after persist_boot has read the original sections and
  * before autosave_resume restores the actual working project. */
 UI_SMALL static void scene_extra_boot(void)
 {
@@ -110,11 +108,10 @@ UI_SMALL static void scene_extra_boot(void)
     }
 #endif
 }
-
 '''
 replace(proj,
     'static const char *const SEC_NAME[4] = {"A", "B", "C", "D"};',
-    insert+'static const char *const SEC_NAME[4] = {"A", "B", "C", "D"};')
+    boot+'static const char *const SEC_NAME[4] = {"A", "B", "C", "D"};')
 
 replace(proj,
     '    proj_capture(p);\n#if FELUCCA_FLASH\n    if (flash_ok) {',
@@ -179,6 +176,10 @@ replace(arr,
     '    proj_apply(&song_keep, 1);\n'
     '    scene_extra_apply_pair(&song_keep, &song_extra[0], &song_extra[1], 3u);\n'
     '    song.sel =')
+
+replace("tests/song_audio_test.c",
+    "    printf(\"song audio: 3 synth parts + drums, section at %u, stop at %u, no held sequencer notes PASS\\\\n\",at_change,at_stop);",
+    "    /* Regression: LITE (track 4) and drum 2 (track 6) must have different\n     * steps in A and B. Apply through the real arrangement scene loader. */\n    {\n        trk[NHEAVY].p[P_LEVEL] = 41;\n        trk[NHEAVY].step[0].n = 1;\n        trk[NHEAVY].step[0].time = ST_NOTE;\n        trk[NHEAVY].step[0].note[0] = 61;\n        TDRUM2->p[P_LEVEL] = 31;\n        TDRUM2->dstep[0].on[0] = 0x04u;\n        TDRUM2->dstep[0].on[1] = 0;\n        scene_extra_capture(0);\n\n        trk[NHEAVY].p[P_LEVEL] = 71;\n        trk[NHEAVY].step[0].note[0] = 74;\n        TDRUM2->p[P_LEVEL] = 81;\n        TDRUM2->dstep[0].on[0] = 0x10u;\n        scene_extra_capture(1);\n\n        arrangement_apply(0);\n        assert(trk[NHEAVY].p[P_LEVEL] == 41 &&\n               trk[NHEAVY].step[0].note[0] == 61 &&\n               TDRUM2->p[P_LEVEL] == 31 &&\n               TDRUM2->dstep[0].on[0] == 0x04u);\n\n        arrangement_apply(1);\n        assert(trk[NHEAVY].p[P_LEVEL] == 71 &&\n               trk[NHEAVY].step[0].note[0] == 74 &&\n               TDRUM2->p[P_LEVEL] == 81 &&\n               TDRUM2->dstep[0].on[0] == 0x10u);\n\n        arrangement_apply(0);\n        assert(trk[NHEAVY].step[0].note[0] == 61 &&\n               TDRUM2->dstep[0].on[0] == 0x04u);\n        printf(\"Kitten A/B: independent LITE and DRUM2 patterns PASS\\n\");\n    }\n\n    printf(\"song audio: 3 synth parts + drums, section at %u, stop at %u, no held sequencer notes PASS\\\\n\",at_change,at_stop);")
 
 replace(main,
     '    song.master_q12 = 2048;\n    autosave_resume();',
