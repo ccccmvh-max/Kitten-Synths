@@ -7,7 +7,7 @@
 Adapta el controlador ST7789 del FM-1 para una pantalla física de **240 × 320 píxeles**. La interfaz de SLOOP 3 mantiene las coordenadas lógicas de 240 × 240 y se **estira verticalmente**, tal como la adaptación de Kitten para la misma pantalla: por cada tres filas originales se dibuja una fila adicional.
 
 - La pantalla de arranque y rescate también ocupa los 320 píxeles de alto.
-- Se conserva la transmisión por DMA no bloqueante que usa SLOOP 3; los bloques se envían por segmentos, repitiendo las filas necesarias.
+- Se conserva la transmisión por DMA no bloqueante de SLOOP 3: cada bloque se dibuja con 12 filas lógicas, se amplía a 16 filas **dentro del mismo búfer** y se transmite de una sola vez.
 - La corrección del registro ST7789 incluye el byte alto de las coordenadas para alcanzar las filas físicas 256–319.
 - No se cambia ninguna función de síntesis, secuenciador, MIDI ni guardado.
 
@@ -38,7 +38,7 @@ SLOOP 3 puede leer algunos datos heredados de SLOOP 2.8, pero **no se ha comprob
 
 ## Notas técnicas
 
-El controlador de SLOOP 3 usa DMA de SPI1 y tiles de 120 × 16. La función `lcd_tile_busy()` debe seguir devolviendo «ocupado» hasta terminar **todos** los segmentos y duplicaciones de filas: el renderizador reutiliza el mismo búfer inmediatamente después. Por eso no sirve copiar directamente el parche de la pantalla de Kitten 2.8.
+El controlador de SLOOP 3 utiliza SPI1 y DMA. El renderizador se ajusta de **120 × 16 píxeles lógicos** a **120 × 12**, pero mantiene la misma reserva de memoria de **120 × 16**. Justo antes del DMA, cada bloque se estira verticalmente **en el propio búfer**, copiando de abajo hacia arriba, y se envía entero con una sola transferencia. Así no hay que reservar RAM adicional. `lcd_tile_busy()` conserva su funcionamiento asíncrono: el siguiente bloque no se dibuja hasta finalizar la transferencia.
 
 La conversión vertical de coordenadas es `Y_física = Y_lógica + floor(Y_lógica / 3)`. Para el origen de la ventana y para su final se usa la misma función, de forma que se alcanzan exactamente 320 filas.
 
