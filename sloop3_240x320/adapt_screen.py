@@ -150,4 +150,25 @@ main = main.replace(before_height, "#define TILE_H 12", 1)
 main = main.replace(before_buffer,
                     'static uint16_t tilebuf[TILE_W * 16] __attribute__((aligned(4), section(".bootbss")));', 1)
 main_path.write_text(main)
-print(f"Adapted {path} and {main_path} to 2-inch ST7789 240x320 without extra RAM")
+
+# SLOOP 3.4.1 sits against the sample-bank boundary in flash. Remove only
+# the lengthy startup LOGO ANIMATION. Keep every one of the six visualisers
+# (including the SLOOP visualiser) and all sounds, sequencer, effects, etc.
+# Display a static readable version title instead, using an existing font.
+vis_path = root / "app/vis.c"
+vis = vis_path.read_text()
+splash_start = "void vis_splash_draw(void)\n{"
+splash_end = "\nvoid vis_draw(void)"
+if vis.count(splash_start) != 1 or vis.count(splash_end) != 1:
+    raise SystemExit("Could not find SLOOP 3.4.1 splash animation")
+a = vis.index(splash_start)
+b = vis.index(splash_end, a)
+vis = vis[:a] + '''void vis_splash_draw(void)
+{
+    gfx_fill(0, 0, GFX_W, GFX_H, RGB(8, 10, 16));
+    gfx_text_c(&font_s, 120, 120, "SLOOP 3", RGB(230, 235, 245));
+}
+''' + vis[b:]
+vis_path.write_text(vis)
+print(f"Adapted {path} and {main_path} to 2-inch ST7789 240x320, no extra RAM, simplified startup animation")
+
