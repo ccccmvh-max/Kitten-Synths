@@ -1,0 +1,66 @@
+name: Publicar SLOOP 3.4.1 2in (240x320) beta
+
+on:
+  push:
+    branches: [sloop3-240x320]
+    paths: [".github/workflows/publish-sloop3-2in.yml"]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar que el firmware publicado procede de una compilación aprobada
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          result=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/44979299063" --jq .conclusion)
+          test "$result" = "success" || { echo "::error::The pinned firmware run did not pass"; exit 1; }
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/44979299063" --jq .head_sha)
+          test "$sha" = "5005dc46ee61809cc6383d3166db0465535efd58" || { echo "::error::Unexpected firmware commit"; exit 1; }
+
+      - name: Descargar exactamente los ficheros que pasó GitHub Actions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh run download 44979299063 --repo "$GITHUB_REPOSITORY" \
+            --name SLOOP3-3.4.1-ST7789-240x320-EXPERIMENTAL --dir dist
+          test -s dist/instalador-SLOOP3-240x320-EXPERIMENTAL.html
+          test -s dist/sloop3-3.4.1-240x320-EXPERIMENTAL.area
+          test -s dist/editor-SLOOP3-3.4.1.html
+          test -s dist/LEEME.md
+          echo "Archivos verificados:"
+          ls -lh dist/
+
+      - name: Publicar Release beta sin modificar Kitten 2.8
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="sloop3-v3.4.1-st7789-240x320-beta1"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "La Release ya existe, sin cambios."
+            exit 0
+          fi
+          gh release create "$tag" \
+            dist/instalador-SLOOP3-240x320-EXPERIMENTAL.html \
+            dist/sloop3-3.4.1-240x320-EXPERIMENTAL.area \
+            dist/editor-SLOOP3-3.4.1.html \
+            dist/LEEME.md \
+            --repo "$GITHUB_REPOSITORY" \
+            --target 5005dc46ee61809cc6383d3166db0465535efd58 \
+            --title 'SLOOP 3.4.1 beta — FM-1 pantalla 2″ ST7789 (240×320)' \
+            --notes-file .github/releases/sloop3-3.4.1-st7789-240x320.md \
+            --prerelease
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" \
+            --json url,tagName,isPrerelease,assets --jq '{url: .url, tag: .tagName, beta: .isPrerelease, assets: [.assets[].name]}'
