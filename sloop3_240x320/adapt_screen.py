@@ -2,10 +2,9 @@
 """Adapt the ST7789 driver of SLOOP 3.4.1 to a 240x320, 2-inch display.
 
 The GUI stays 240x240. Map Y -> Y + floor(Y/3) and duplicate every third row.
-Unlike the SLOOP 2 driver, SLOOP 3 sends tiles *asynchronously* through SPI1
-DMA. Stream each original run and its repeated final row as multiple DMA
-segments without overwriting the tile buffer or blocking the audio thread.
-No extra frame buffer is allocated.
+SLOOP 3 sends 120x16 tiles asynchronously through SPI1 DMA. Change its
+logical tile height to 12, and expand the 12 rows to 16 *in place* (backwards).
+The original DMA contract and exactly the same buffer size are retained.
 """
 from pathlib import Path
 import sys
@@ -77,14 +76,13 @@ int lcd_tile_busy(void)
     return 0;
 }''',
 
-    '''/* The original SLOOP 3 renderer produces 120x16 tiles. Expand each
- * tile to at most 120x22 pixels in boot RAM, then do ONE asynchronous
- * DMA transfer as before. This avoids growing RAM-app code with a DMA
- * segment state machine, and leaves the audio/timing behaviour intact.
- * The source tile remains owned by the caller until this copy completes. */
-static uint16_t tile320[120u * 22u] __attribute__((aligned(4), section(".lowbss")));
+    '''/* The SLOOP 3 UI originally has 120x16 tiles. Use 120x12 logical
+ * tiles, which stretch to exactly 120x16 on the 240x320 ST7789.
+ * Expand IN PLACE, from the last row upwards: no new frame buffer,
+ * no extra RAM, and the single asynchronous DMA remains unchanged.
+ * The sole caller is fw/main.c's ui_step; its tile is writeable. */
 static int tile_on;
-/* Only called from ui_step (in .xtext) when the flash window is active. */
+/* The UI can access XIP when this is called; no display during flash saves. */
 __attribute__((section(".xtext.board"))) void lcd_tile_start(int x, int y, int w, int h, const void *px)
 {
     {
@@ -93,25 +91,20 @@ __attribute__((section(".xtext.board"))) void lcd_tile_start(int x, int y, int w
             SPI1_CON |= 1u << 14; pin_set(LCD_CS, 1); tile_on = 0; break;
         }
     }
-    /* All callers use 120x16 tiles. Their physical height is 21-22 px. */
     int physical_y = lcd_y320(y), physical_h = lcd_y320(y + h) - physical_y;
-    const uint16_t *src = (const uint16_t *)px;
-    int out = 0;
-    for (int row = 0; row < h; row++) {
-        uint16_t *dst = tile320 + out * w;
-        const uint16_t *line = src + row * w;
-        int twice = (y + row) % 3 == 2;
-        for (int col = 0; col < w; col++) {
-            uint16_t v = line[col];
-            dst[col] = v;
-            if (twice) dst[w + col] = v;
+    uint16_t *tile = (uint16_t *)(uintptr_t)px;
+    for (int row = h - 1; row >= 0; row--) {
+        int dst = lcd_y320(y + row) - physical_y, twice = (y + row) % 3 == 2;
+        for (int col = w - 1; col >= 0; col--) {
+            uint16_t v = tile[row * w + col];
+            if (twice) tile[(dst + 1) * w + col] = v;
+            tile[dst * w + col] = v;
         }
-        out += 1 + twice;
     }
     lcd_window(x, physical_y, w, physical_h);
     pin_set(LCD_DC, 1); pin_set(LCD_CS, 0);
     SPI1_CON &= ~(1u << 12);
-    SPI1_ADR = (uint32_t)(uintptr_t)tile320;
+    SPI1_ADR = (uint32_t)(uintptr_t)px;
     SPI1_CNT = (uint32_t)(w * physical_h * 2);
     tile_on = 1;
 }
@@ -143,18 +136,18 @@ replace_one(
 
 path.write_text(source)
 
-# SLOOP 3 is within a few bytes of the RAM-app code limit. Compile ONLY the
-# display driver with -Oz instead of -Os. No changes to the engine, scheduler
-# or UI optimisations, and no user-visible functionality is removed.
-build_path = root / "fw/build.sh"
-build = build_path.read_text()
-before = '''  "$TC/clang" $(echo "$CF" | sed 's/-O2/-Os/') -c $f -o $O/o/$(basename $f .c).o'''
-after = '''  if [ "$f" = "hal/fm1/board.c" ]; then
-    "$TC/clang" $(echo "$CF" | sed 's/-O2/-Oz/') -c $f -o $O/o/$(basename $f .c).o
-  else
-    "$TC/clang" $(echo "$CF" | sed 's/-O2/-Os/') -c $f -o $O/o/$(basename $f .c).o
-  fi'''
-if build.count(before) != 1:
-    raise SystemExit("Cannot locate the SLOOP 3.4.1 display compiler command")
-build_path.write_text(build.replace(before, after, 1))
-print(f"Adapted {path} to ST7789 240x320 (2 inches), DMA tiles + boot text; display compiled at -Oz")
+# The SLOOP 3 renderer has 240 logical rows. Twelve divides 240 and
+# each 12-row tile becomes precisely 16 physical rows. Preserve the
+# ORIGINAL 120x16 buffer capacity in boot RAM: only its logical draw
+# height is changed from 16 to 12. No extra RAM allocations.
+main_path = root / "fw/main.c"
+main = main_path.read_text()
+before_height = "#define TILE_H 16"
+before_buffer = 'static uint16_t tilebuf[TILE_W * TILE_H] __attribute__((aligned(4), section(".bootbss")));'
+if main.count(before_height) != 1 or main.count(before_buffer) != 1:
+    raise SystemExit("Unexpected SLOOP 3.4.1 tile definitions")
+main = main.replace(before_height, "#define TILE_H 12", 1)
+main = main.replace(before_buffer,
+                    'static uint16_t tilebuf[TILE_W * 16] __attribute__((aligned(4), section(".bootbss")));', 1)
+main_path.write_text(main)
+print(f"Adapted {path} and {main_path} to 2-inch ST7789 240x320 without extra RAM")
