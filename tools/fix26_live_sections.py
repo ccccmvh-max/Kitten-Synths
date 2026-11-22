@@ -200,6 +200,17 @@ gfx_src = gfx_ui.read_text()
 decor = "cv_web(C_LINE);"
 if gfx_src.count(decor) < 1:
     raise SystemExit("Expected decorative graph-web call not present")
-gfx_ui.write_text(gfx_src.replace(decor, "/* decorative overlay omitted for scene memory */"))
+gfx_src = gfx_src.replace(decor, "/* decorative overlay omitted for scene memory */")
+# Decorative skyline, moons and kittens on the header: do not display them.
+# The user's actual synth menus, note indicators and 240x320 stretching stay.
+# When these calls disappear the C compiler can omit the unused drawing routines.
+import re
+header_decor = re.compile(r"(?m)^    cv_(?:roofs|cat)\\([^;\\n]*\\);[^\\n]*$")
+calls = header_decor.findall(gfx_src)
+if len(calls) != 6:
+    raise SystemExit(f"Expected 3 skyline and 3 cat calls, got {len(calls)}")
+gfx_src = header_decor.sub("    /* optional Kitten header art omitted to free program flash */", gfx_src)
+gfx_ui.write_text(gfx_src)
 
 print("Scene fix applied to", root)
+print("Removed", len(calls), "decorative cat and skyline calls; ST7789 240x320 scaling preserved")
