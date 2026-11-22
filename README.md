@@ -17,6 +17,19 @@ Por <b>Black Kitten Devices</b> · GPL-3.0 · basado en <a href="https://github.
 <a href="README.en.md">English</a>
 </p>
 
+## Sobre esta bifurcación: pantalla 2″ y secciones A–D
+
+> **Adaptación experimental, no oficial, de [Kitten Synths de Black Kitten Devices](https://github.com/BlackKittenDevices/Kitten-Synths).** Esta bifurcación mantiene las funciones originales de Kitten y desarrolla dos cambios para el M-Vave FM-1:
+>
+> - **Pantalla ST7789 de 2 pulgadas (240 × 320):** la interfaz original de 240 × 240 se estira verticalmente para usar toda la pantalla, sin reorganizar los menús. La adaptación **ya se ha probado en un FM-1 real** y funciona en ese dispositivo.
+> - **Secciones A, B, C y D:** corrección experimental para que la **pista 4 (LITE)** y la **pista 6 (segunda batería)** mantengan patrones diferentes al cambiar de sección. En el código original de esta bifurcación, los cambios realizados en una sección podían verse también en las demás.
+>
+> **Estado:** la compilación con el arreglo de secciones ha generado un archivo `.fwsc`, pero **sus pruebas de integración siguen fallando**. No se considera una actualización validada ni se recomienda instalarla hasta superar las pruebas. El hecho de que aparezca un artefacto descargable en Actions no significa que haya pasado toda la validación.
+>
+> **[Explicación del problema, cómo se corrige, pruebas e instalación sin Python](MODIFICACIONES_FORK.md)** · [Compilación y pruebas actuales](https://github.com/ccccmvh-max/Kitten-Synths/actions/workflows/build.yml)
+
+![Estado de la compilación y las pruebas](https://github.com/ccccmvh-max/Kitten-Synths/actions/workflows/build.yml/badge.svg)
+
 ---
 
 > ### 🥁 NUEVO: dos baterías y 8 canales a tu DAW
@@ -64,6 +77,8 @@ Pantallas del FM-1 generadas con el código real del firmware (en el equipo se v
 
 Paso a paso en el [Manual, capítulo 2](MANUAL.md#2-instalación).
 
+**Alternativa sin Python:** el instalador web [fm-static](https://seajaysec.github.io/fm-static/) permite seleccionar un archivo `.fwsc` local desde Chrome o Edge. **Usar solo una compilación comprobada** y guardar una copia de seguridad antes de actualizar. [Más detalles](MODIFICACIONES_FORK.md#6-instalación-sin-python-cuando-exista-una-versión-validada).
+
 ### Antes de instalar
 
 - Hacé una **copia de seguridad** de lo que tengas en el FM-1 (canciones, presets propios, muestras) con el editor web del firmware que uses ahora.
@@ -84,6 +99,9 @@ Online, sin instalar nada: [el FM-1 en el navegador](https://blackkittendevices.
 | Archivo | Para qué sirve |
 | --- | --- |
 | `muug.patch` y `fix-01.patch` … `fix-24.patch` | Todo lo que Kitten Synths agrega a SLOOP 2.8, en orden. Se aplican sobre un commit fijo de SLOOP. |
+| `fix-25.patch` | Adaptación gráfica a pantalla ST7789 de 2 pulgadas y 240 × 320 píxeles. |
+| `tools/fix26_live_sections.py` | Corrección en desarrollo para patrones diferentes de LITE y batería 2 en las secciones A–D, más pruebas de regresión. |
+| `MODIFICACIONES_FORK.md` | Explicación técnica y práctica de los cambios de esta bifurcación, su estado y sus limitaciones. |
 | `.github/workflows/build.yml` | Baja SLOOP, aplica los parches, corre los tests y compila con la cadena de herramientas de JieLi. |
 | `servir.py` | Sirve el instalador y el simulador en tu computadora. |
 | `splashes y logos/` | Las imágenes del gatito (bienvenida, ojos abiertos y cerrados). |
