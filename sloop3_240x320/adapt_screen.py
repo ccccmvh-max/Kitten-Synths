@@ -82,9 +82,10 @@ int lcd_tile_busy(void)
  * DMA transfer as before. This avoids growing RAM-app code with a DMA
  * segment state machine, and leaves the audio/timing behaviour intact.
  * The source tile remains owned by the caller until this copy completes. */
-static uint16_t tile320[120u * 22u] __attribute__((aligned(4), section(".bootbss")));
+static uint16_t tile320[120u * 22u] __attribute__((aligned(4), section(".lowbss")));
 static int tile_on;
-void lcd_tile_start(int x, int y, int w, int h, const void *px)
+/* Only called from ui_step (in .xtext) when the flash window is active. */
+__attribute__((section(".xtext.board"))) void lcd_tile_start(int x, int y, int w, int h, const void *px)
 {
     {
         uint32_t t0 = T0_CNT;
@@ -114,7 +115,7 @@ void lcd_tile_start(int x, int y, int w, int h, const void *px)
     SPI1_CNT = (uint32_t)(w * physical_h * 2);
     tile_on = 1;
 }
-int lcd_tile_busy(void)
+__attribute__((section(".xtext.board"))) int lcd_tile_busy(void)
 {
     if (!tile_on) return 0;
     if (!(SPI1_CON & (1u << 15))) return 1;
