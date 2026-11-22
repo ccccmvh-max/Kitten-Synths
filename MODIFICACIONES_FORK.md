@@ -64,6 +64,12 @@ No intenta aumentar la cantidad de controles ni reorganizar páginas. El usuario
 
 **La corrección de las pistas 4 y 6 debe conservar este parche.** Una versión de Kitten sin `fix-25.patch` no es equivalente a la compilación adaptada para la pantalla.
 
+### Memoria de programa y elementos visuales opcionales
+
+El FM-1 tiene un espacio de firmware muy limitado. Una compilación experimental anterior solo dejaba **72 bytes libres** en la región de programa; por eso, como alternativa a eliminar funciones musicales, se han retirado **adornos visuales** en `tools/fix26_live_sections.py`: la telaraña de los gráficos y las llamadas que dibujan gatos, tejados y lunas en las cabeceras. Si la memoria se llena, el proceso de compilación ya sustituye también el logotipo gráfico de arranque por un texto.
+
+Este recorte **no elimina los controles, los patrones, los seis canales ni el estiramiento ST7789 de 240 × 320**. La memoria disponible después del recorte debe comprobarse en los registros de la nueva compilación; no se presupone una cifra hasta que GitHub Actions confirme el resultado.
+
 ## 5. Cómo se construye
 
 La automatización [`.github/workflows/build.yml`](.github/workflows/build.yml):
