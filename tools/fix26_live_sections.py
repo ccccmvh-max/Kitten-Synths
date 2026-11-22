@@ -28,7 +28,7 @@ replace(proj,
 # host storage tests include that source directly, outside project.c.
 replace(store,
     '#define KS_MAGIC 0x4B534331u',
-    'static const proj_trk_t *scene_extra_write_rec; /* null: capture working track */\\n'
+    'static const proj_trk_t *scene_extra_write_rec; /* null: capture working track */\n'
     '#define KS_MAGIC 0x4B534331u')
 
 replace(store,
