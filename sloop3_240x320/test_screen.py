@@ -43,4 +43,31 @@ assert y320(192) == 256
 assert y320(224) == 298
 assert max(sent_rows(224, 16)) == 239
 assert len(sent_rows(224, 16)) == 22
-print("ST7789 240x320 tile and address geometry PASSED")
+# 12 logical rows stretched in-place to 16 physical, without extra RAM:
+# the drawing buffer has the original 120x16 capacity.
+for y in range(0, 240, 12):
+    for w in (1, 8, 120):
+        h = 12
+        capacity_rows = 16
+        tile = [0] * (w * capacity_rows)
+        for row in range(h):
+            for col in range(w):
+                tile[row * w + col] = 1000 * (y + row) + col
+        original = tile[:w * h]
+        for row in range(h - 1, -1, -1):
+            dst = y320(y + row) - y320(y)
+            twice = ((y + row) % 3) == 2
+            for col in range(w - 1, -1, -1):
+                value = tile[row * w + col]
+                if twice:
+                    tile[(dst + 1) * w + col] = value
+                tile[dst * w + col] = value
+        expected = []
+        for source_row in range(h):
+            values = original[source_row * w:(source_row + 1) * w]
+            expected.extend(values)
+            if (y + source_row) % 3 == 2:
+                expected.extend(values)
+        assert len(expected) == w * 16
+        assert tile == expected, (y, w)
+print("ST7789 240x320 geometry and in-place tile expansion PASSED")
