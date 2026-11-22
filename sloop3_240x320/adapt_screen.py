@@ -76,72 +76,52 @@ int lcd_tile_busy(void)
     tile_on = 0;
     return 0;
 }''',
-    '''/* SLOOP 3 reuses the 120x16 tile buffer *after* lcd_tile_busy() returns 0.
- * Keep the same asynchronous contract. Never read an active tile after it
- * has been overwritten. Split a tile into DMA segments and repeat row 2 of
- * every 3 logical rows, preserving the original 240x240 GUI coordinates.
- * No 240x320 screen buffer or additional tile memory is necessary. */
+
+    '''/* The original SLOOP 3 renderer produces 120x16 tiles. Expand each
+ * tile to at most 120x22 pixels in boot RAM, then do ONE asynchronous
+ * DMA transfer as before. This avoids growing RAM-app code with a DMA
+ * segment state machine, and leaves the audio/timing behaviour intact.
+ * The source tile remains owned by the caller until this copy completes. */
+static uint16_t tile320[120u * 22u] __attribute__((aligned(4), section(".bootbss")));
 static int tile_on;
-static const uint16_t *tile_pixels;
-static uint32_t tile_w, tile_h, tile_row, tile_group;
-static int tile_repeat;
-static void lcd_tile_next(void)
-{
-    const uint16_t *pixels;
-    uint32_t bytes;
-    if (tile_repeat) {
-        tile_repeat = 0;
-        pixels = tile_pixels + (tile_row - 1u) * tile_w;
-        bytes = tile_w * 2u;
-    } else if (tile_row < tile_h) {
-        uint32_t n = tile_h - tile_row;
-        if (n > tile_group) n = tile_group;
-        pixels = tile_pixels + tile_row * tile_w;
-        bytes = n * tile_w * 2u;
-        tile_row += n;
-        tile_repeat = n == tile_group;
-        tile_group = 3u;
-    } else {
-        pin_set(LCD_CS, 1);
-        tile_on = 0;
-        return;
-    }
-    SPI1_CON &= ~(1u << 12);                /* SPI1 TX */
-    SPI1_ADR = (uint32_t)(uintptr_t)pixels;
-    SPI1_CNT = bytes;                       /* starts the next async segment */
-}
 void lcd_tile_start(int x, int y, int w, int h, const void *px)
 {
-    {   /* The previous tile must finish before the caller reuses its RAM. */
+    {
         uint32_t t0 = T0_CNT;
-        while (lcd_tile_busy())
-            if ((uint32_t)(T0_CNT - t0) > 30000u * lsb_mhz) {
-                SPI1_CON |= 1u << 14;
-                pin_set(LCD_CS, 1);
-                tile_on = 0;
-                break;
-            }
+        while (lcd_tile_busy()) if ((uint32_t)(T0_CNT - t0) > 30000u * lsb_mhz) {
+            SPI1_CON |= 1u << 14; pin_set(LCD_CS, 1); tile_on = 0; break;
+        }
     }
+    /* All callers use 120x16 tiles. Their physical height is 21-22 px. */
     int physical_y = lcd_y320(y), physical_h = lcd_y320(y + h) - physical_y;
+    const uint16_t *src = (const uint16_t *)px;
+    int out = 0;
+    for (int row = 0; row < h; row++) {
+        uint16_t *dst = tile320 + out * w;
+        const uint16_t *line = src + row * w;
+        int twice = (y + row) % 3 == 2;
+        for (int col = 0; col < w; col++) {
+            uint16_t v = line[col];
+            dst[col] = v;
+            if (twice) dst[w + col] = v;
+        }
+        out += 1 + twice;
+    }
     lcd_window(x, physical_y, w, physical_h);
-    tile_pixels = (const uint16_t *)px;
-    tile_w = (uint32_t)w;
-    tile_h = (uint32_t)h;
-    tile_row = 0u;
-    tile_group = 3u - ((uint32_t)y % 3u);
-    tile_repeat = 0;
+    pin_set(LCD_DC, 1); pin_set(LCD_CS, 0);
+    SPI1_CON &= ~(1u << 12);
+    SPI1_ADR = (uint32_t)(uintptr_t)tile320;
+    SPI1_CNT = (uint32_t)(w * physical_h * 2);
     tile_on = 1;
-    pin_set(LCD_DC, 1);
-    pin_set(LCD_CS, 0);
-    lcd_tile_next();
 }
 int lcd_tile_busy(void)
 {
     if (!tile_on) return 0;
     if (!(SPI1_CON & (1u << 15))) return 1;
-    SPI1_CON |= 1u << 14;                   /* acknowledge completed segment */
-    lcd_tile_next();
-    return tile_on;
+    SPI1_CON |= 1u << 14;
+    pin_set(LCD_CS, 1);
+    tile_on = 0;
+    return 0;
 }''',
 )
 
