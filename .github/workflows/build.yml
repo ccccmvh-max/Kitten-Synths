@@ -112,19 +112,21 @@ jobs:
           cp tests/target_budget.txt ../tb.txt && BUDGET_UPDATE=1 python3 tests/target_budget.py build/felucca.dis ../tb.txt > /dev/null 2>&1 || true
           echo "::notice title=BUDGET-NEW::$(grep -v '^#' ../tb.txt | tr '\n' ';' | cut -c1-1500)"
 
-      - name: Tests (the host suite and the web editor)
-        continue-on-error: true
+      - name: Tests (the host suite, live A/B scene regression, and the web editor)
         run: |
+          set -euo pipefail
           cd sloop
-          # (run_tests.sh looks for build/felucca.fwsc: the package of this build, whatever its name)
           [ -f build/felucca.fwsc ] || cp "$(ls build/*.fwsc | head -1)" build/felucca.fwsc
-          timeout 2400 sh tests/run_tests.sh > ../tests.log 2>&1 || echo "run_tests.sh stopped: $?" >> ../tests.log
+          if ! timeout 2400 sh tests/run_tests.sh > ../tests.log 2>&1; then
+            tail -80 ../tests.log
+            echo "::error title=HOST TESTS::test suite failed; no validated firmware"
+            exit 1
+          fi
           tail -40 ../tests.log
-          echo "::notice title=TESTS-LAST::$(grep '^== ' ../tests.log | tail -1 | cut -c1-150)"
-          # the result as an annotation (the log is not readable from here): the failed checks' lines, or that all passed
-          if grep -q "ALL HOST TESTS PASSED" ../tests.log; then echo "::notice title=TESTS::all host tests passed"; else
-            echo "::warning title=TESTS::$(grep -E "FAIL|FAILED" ../tests.log | head -25 | tr '\n' ';' | cut -c1-900)"; fi
-          node web/test_web.mjs 2>&1 | tail -3 | tee -a ../tests.log
+          grep -q 'ALL HOST TESTS PASSED' ../tests.log
+          grep -q 'Kitten A/B: independent LITE and DRUM2 patterns PASS' ../tests.log
+          echo "::notice title=HOST TESTS::all host tests passed, including independent LITE and drum 2 A/B"
+          node web/test_web.mjs 2>&1 | tee -a ../tests.log
 
       - name: Site (installer, web editor)
         run: |
@@ -198,21 +200,6 @@ jobs:
           git add -A
           git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "site from ${GITHUB_SHA}"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
-      - name: GitHub Pages on, from gh-pages (once; if the token may not, Settings > Pages does it)
-        if: ${{ github.ref == 'refs/heads/main' }}
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          now=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '"\(.build_type) \(.source.branch)"' 2>/dev/null || echo none)
-          echo "::notice title=PAGES::was: $now"
-          if [ "$now" = "none" ]; then
-            gh api -X POST "repos/$GITHUB_REPOSITORY/pages" -f build_type=legacy -f "source[branch]=gh-pages" -f "source[path]=/" > /dev/null
-          elif [ "$now" != "legacy gh-pages" ]; then
-            gh api -X PUT "repos/$GITHUB_REPOSITORY/pages" -f build_type=legacy -f "source[branch]=gh-pages" -f "source[path]=/"
-          fi
-          echo "::notice title=PAGES::now: $(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '"\(.build_type) \(.source.branch) \(.html_url)"' 2>&1)"
-
       - uses: actions/upload-artifact@v4
         if: always()
         with:
