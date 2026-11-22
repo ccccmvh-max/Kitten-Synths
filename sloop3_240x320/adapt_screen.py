@@ -161,4 +161,19 @@ replace_one(
 )
 
 path.write_text(source)
-print(f"Adapted {path} to ST7789 240x320 (2 inches), DMA tiles + boot text")
+
+# SLOOP 3 is within a few bytes of the RAM-app code limit. Compile ONLY the
+# display driver with -Oz instead of -Os. No changes to the engine, scheduler
+# or UI optimisations, and no user-visible functionality is removed.
+build_path = root / "fw/build.sh"
+build = build_path.read_text()
+before = '''  "$TC/clang" $(echo "$CF" | sed 's/-O2/-Os/') -c $f -o $O/o/$(basename $f .c).o'''
+after = '''  if [ "$f" = "hal/fm1/board.c" ]; then
+    "$TC/clang" $(echo "$CF" | sed 's/-O2/-Oz/') -c $f -o $O/o/$(basename $f .c).o
+  else
+    "$TC/clang" $(echo "$CF" | sed 's/-O2/-Os/') -c $f -o $O/o/$(basename $f .c).o
+  fi'''
+if build.count(before) != 1:
+    raise SystemExit("Cannot locate the SLOOP 3.4.1 display compiler command")
+build_path.write_text(build.replace(before, after, 1))
+print(f"Adapted {path} to ST7789 240x320 (2 inches), DMA tiles + boot text; display compiled at -Oz")
