@@ -1,0 +1,71 @@
+name: SLOOP 3.4.1 (2-inch ST7789, 240x320)
+
+on:
+  push:
+    branches: [sloop3-240x320]
+    paths:
+      - "sloop3_240x320/**"
+      - ".github/workflows/sloop3-240x320.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-240x320:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Obtener SLOOP 3.4.1 beta (fuente original fija)
+        run: |
+          git clone --depth 1 https://github.com/isod89/sloop3-fm1.git sloop3
+          cd sloop3
+          git fetch --depth 1 origin f48b4c8b40dc39da3a8089045a3034fdea1bfa45
+          git checkout --detach f48b4c8b40dc39da3a8089045a3034fdea1bfa45
+      - name: Adaptar pantalla ST7789 a 240x320
+        run: |
+          python3 -m py_compile sloop3_240x320/adapt_screen.py
+          python3 sloop3_240x320/adapt_screen.py sloop3
+          python3 sloop3_240x320/test_screen.py
+      - name: Pruebas del firmware original en PC
+        run: |
+          python3 -m pip install --disable-pip-version-check numpy pillow
+          make -C sloop3 -j2 test > make-test.log 2>&1 || { tail -100 make-test.log; exit 1; }
+          tail -30 make-test.log
+      - name: Instalar compilador pi32v2 LLVM oficial de SLOOP 3
+        run: |
+          curl -fL --retry 3 --retry-delay 3 -o toolchain.tar.xz \
+            https://github.com/jvitkauskas/pi32v2-llvm/releases/download/pi32v2-23.1.5-2/pi32v2-llvm-23.1.5-2-linux-x64.tar.xz
+          echo 'cb896562418a2be93edb9bac26af4bc81a106a32974002a78e6b9fc203c93990  toolchain.tar.xz' | sha256sum -c -
+          mkdir -p sloop3/toolchain
+          tar -xJf toolchain.tar.xz -C sloop3/toolchain --strip-components=1
+          test -x sloop3/toolchain/bin/clang
+      - name: Compilar SLOOP 3 para pantalla 2 pulgadas
+        run: |
+          cd sloop3
+          EDITOR_E2E=0 INSTALLER_E2E=0 sh fw/build.sh toolchain/bin > ../sloop3-build.log 2>&1 || { tail -120 ../sloop3-build.log; exit 1; }
+          tail -45 ../sloop3-build.log
+          test -s build/fw/fw.area
+          test -s build/fw/installer-fm1.html
+          test -s build/fw/editor-sloop3.html
+          sha256sum build/fw/fw.area build/fw/installer-fm1.html
+      - name: Preparar paquete de prueba
+        run: |
+          mkdir -p entrega
+          cp sloop3/build/fw/fw.area entrega/sloop3-3.4.1-240x320-EXPERIMENTAL.area
+          cp sloop3/build/fw/installer-fm1.html entrega/instalador-SLOOP3-240x320-EXPERIMENTAL.html
+          cp sloop3/build/fw/editor-sloop3.html entrega/editor-SLOOP3-3.4.1.html
+          cp sloop3_240x320/LEEME.md entrega/LEEME.md
+      - name: Publicar paquete de prueba
+        uses: actions/upload-artifact@v4
+        with:
+          name: SLOOP3-3.4.1-ST7789-240x320-EXPERIMENTAL
+          path: entrega/
+          if-no-files-found: error
