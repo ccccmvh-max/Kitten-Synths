@@ -22,8 +22,14 @@ main="firmware/src/main.c"
 replace(proj,
     'static project_t autosave_buf __attribute__((section(".pool")));\n#include "kitten_store.c"',
     'static project_t autosave_buf __attribute__((section(".pool")));\n'
-    'static const proj_trk_t *scene_extra_write_rec; /* optional saved scene record when flushing */\n'
     '#include "kitten_store.c"')
+
+# Declare the optional scene record in kitten_store.c itself, since the
+# host storage tests include that source directly, outside project.c.
+replace(store,
+    '#define KS_MAGIC 0x4B534331u',
+    'static const proj_trk_t *scene_extra_write_rec; /* null: capture working track */\\n'
+    '#define KS_MAGIC 0x4B534331u')
 
 replace(store,
     "    memset(r, 0, sizeof *r);\n    proj_trk_capture(r, NHEAVY);",
