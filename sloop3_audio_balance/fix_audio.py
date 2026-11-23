@@ -32,10 +32,14 @@ replace("engine/drum.c",
 #define GB_DRUM_GAIN 0.75f
 #define GB_KICK_GAIN 1.10f""")
 
+replace("engine/drum.c",
+    "v->s.dsmp.gain = lg * 2.43f;",
+    "v->s.dsmp.gain = lg * 1.80f; /* lower sampled GM/USR drums to match the synth kits under the new headroom */")
+
 replace("engine/sound.c",
     "if (k->patch.engine != ENG_DRUM) { lv0 *= duck0; lv1 *= duck1; }",
-    """/* Up to +2.92 dB for synths at the mixer strip; leave the kick's
+    """/* +0.42 dB for synths at the mixer strip; leave the kick's
              * DUCK dynamics, sends, limiter and DAC gain unchanged. */
-            if (k->patch.engine != ENG_DRUM) { lv0 *= duck0 * 1.4f; lv1 *= duck1 * 1.4f; }""")
+            if (k->patch.engine != ENG_DRUM) { lv0 *= duck0 * 1.05f; lv1 *= duck1 * 1.05f; }""")
 
-print("Applied SLOOP 3.4.1 experimental balance: DRUM -6.02 dB, kick extra -2.16 dB, synth +2.92 dB")
+print("Applied SLOOP 3.4.1 experimental balance: DRUM -6.02 dB, kick extra -2.16 dB, synth +0.42 dB")
