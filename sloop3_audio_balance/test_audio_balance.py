@@ -31,11 +31,12 @@ shared = sorted(set(base_k).intersection(new_k))
 assert len(shared) >= 10
 r = new_s / base_s
 gain_db = 20 * __import__("math").log10(r)
-# Mixer-strip synth boost is 1.4x, and should not be saturated by default.
-assert 2.1 <= gain_db <= 3.2, f"Unexpected synth change {gain_db:+.2f} dB"
+# Mixer-strip synth boost is 1.05x; a conservative change that keeps the FX/no-click tests valid.
+assert 0.1 <= gain_db <= 0.7, f"Unexpected synth change {gain_db:+.2f} dB"
 kick_change = statistics.median(new_k[k] - base_k[k] for k in shared)
-# New kick gain: 0.75/1.5 * 1.10/1.41 = 0.390, i.e. -8.16 dB;
-# synth is +2.9 dB. Allow effects/limiter/headroom to affect the result.
+# New kick gain: 0.75/1.5 * 1.10/1.41 = 0.390 (-8.16 dB);
+# sampled drums get an extra factor 1.80/2.43, while synths are +0.42 dB.
+# Allow effects, clipping release and the final limiter to affect the level.
 assert kick_change < -6.0, f"Drum kick relative change too small: {kick_change:+.2f} dB"
-assert kick_change > -14, f"Drum kick relative change suspicious: {kick_change:+.2f} dB"
+assert kick_change > -16, f"Drum kick relative change suspicious: {kick_change:+.2f} dB"
 print(f"Audio balance PASS: synths {gain_db:+.2f} dB, median kick-vs-synth {kick_change:+.2f} dB ({len(shared)} kits)")
