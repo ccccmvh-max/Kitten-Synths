@@ -13,9 +13,10 @@ Usuarios del SLOOP 3 original notificaron problemas parecidos en los [issues #16
 
 1. **Baterías:** `GB_DRUM_GAIN` de 1,50 a **0,75** (−6,02 dB). Se reduce el nivel desde el motor de batería, antes de insertos, mezclador, efectos y limitador.
 2. **Bombos:** ganancia extra de 1,41 a **1,10** (−2,16 dB adicionales). Aumenta el margen para los picos más potentes.
-3. **Sintetizadores:** la ganancia de tira en la mezcla aumenta de 1,00 a **1,40** (+2,92 dB), después de sintetizar y antes del sumador; se mantiene el DUCK.
-4. **Sin subir el volumen maestro/DAC:** permanece la ganancia máxima original, el limitador de −1 dBFS, las funciones de audio USB, los efectos, las cinco pistas y el motor de síntesis original.
-5. **Pantalla sin cambios:** ST7789 de 2 pulgadas y 240 × 320, con imagen estirada como en nuestra versión confirmada.
+3. **Kits de muestras GM/USR:** su coeficiente de ganancia se reduce de 2,43 a **1,80** (−2,61 dB adicionales) para compensar su mayor volumen relativo frente a los kits sintetizados.
+4. **Sintetizadores:** la ganancia de tira en la mezcla aumenta moderadamente de 1,00 a **1,05** (+0,42 dB), después de sintetizar y antes del sumador; se mantiene el DUCK.
+5. **Sin subir el volumen maestro/DAC:** permanece la ganancia máxima original, el limitador de −1 dBFS, las funciones de audio USB, los efectos, las cinco pistas y el motor de síntesis original.
+6. **Pantalla sin cambios:** ST7789 de 2 pulgadas y 240 × 320, con imagen estirada como en nuestra versión confirmada.
 
 Son ajustes conservadores y **no aplican compresión adicional ni recortan las ondas de batería**. Se ha mantenido el código fuente de la versión funcional; los cambios se aplican solo en la compilación de esta rama.
 
